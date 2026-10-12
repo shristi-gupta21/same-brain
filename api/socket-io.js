@@ -8,7 +8,7 @@ const redisUrl = process.env.REDIS_URL?.replace(/^redis:\/\//, 'rediss://');
 const restUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const restToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 const io = new Server(server, {
-  path: '/api/socket-io/socket.io',
+  path: '/api/socket-io',
   transports: ['websocket'],
   serveClient: true,
   connectTimeout: 5000,
