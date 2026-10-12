@@ -6,7 +6,9 @@ const badWords = /\b(?:fuck|shit|bitch|asshole|cunt|nigger|faggot)\b/i;
 const scoreTable = { 2: 100, 3: 70, 4: 50, 5: 40, 6: 30 };
 const roomTtl = 3600;
 const sessionTtl = 86400;
-const disconnectGrace = 30000;
+// Mobile browsers can suspend background tabs for a while; do not treat a
+// missed poll as a departed player after only a few seconds.
+const disconnectGrace = 120000;
 
 const json = (res, status, data) => {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
