@@ -14,7 +14,7 @@ function stopStream() {
 function connectRealtime() {
   if (!state.session || state.socket || typeof window.io !== 'function') return;
   const socket = window.io({
-    path: '/api/socket-io',
+    path: '/api/socket-io/socket.io',
     transports: ['websocket'],
     auth: { session: state.session },
     reconnection: true,

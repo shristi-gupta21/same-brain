@@ -244,7 +244,7 @@ const server = http.createServer(async (req, res) => {
 function startGame(room) { clearTimers(room); room.used = []; room.round = 0; room.players.forEach(p => { p.score = 0; p.matches = 0; }); beginRound(room); }
 export { bank };
 if (!process.env.VERCEL) {
-  io = new SocketServer(server, { path: '/api/socket-io', transports: ['websocket'] });
+  io = new SocketServer(server, { path: '/api/socket-io/socket.io', transports: ['websocket'] });
   io.use((socket, next) => {
     const found = playerFor(socket.handshake.auth?.session);
     if (!found) return next(new Error('This room session has ended.'));
