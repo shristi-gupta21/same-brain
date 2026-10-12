@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { bank } from '../server.js';
+import { publishRoomChanged, roomRevision } from './realtime.js';
 
 const colors = ['#ef8b70', '#8b92e8', '#64b99d', '#e0ab48', '#d67dac', '#5aa9c5'];
 const badWords = /\b(?:fuck|shit|bitch|asshole|cunt|nigger|faggot)\b/i;
@@ -200,6 +201,7 @@ async function withPlayerRoom(session, callback) {
   return withLock(`room:${location.room}`, async () => {
     const room = await getRoom(location.room);
     if (!room) throw new Error('This room has ended.');
+    const before = roomRevision(room);
     const player = room.players.find(item => item.id === location.playerId && item.session === session);
     if (!player) throw new Error('Your session has expired.');
     const now = Date.now();
@@ -209,9 +211,11 @@ async function withPlayerRoom(session, callback) {
     try {
       const result = await callback(room, player, now);
       await saveRoom(room);
+      if (before !== roomRevision(room)) await publishRoomChanged(room.code);
       return result;
     } catch (error) {
       await saveRoom(room);
+      if (before !== roomRevision(room)) await publishRoomChanged(room.code);
       throw error;
     }
   });
@@ -272,9 +276,11 @@ export default async function handler(req, res) {
       const result = await withLock(`room:${code}`, async () => {
         const room = await getRoom(code);
         if (!room) throw new Error('We could not find that room code.');
+        const before = roomRevision(room);
         advance(room, Date.now());
         const added = await addPlayer(room, data.name);
         await saveRoom(room);
+        if (before !== roomRevision(room)) await publishRoomChanged(room.code);
         return { session: added.session, code: room.code };
       });
       return json(res, 200, result);
@@ -288,12 +294,19 @@ export default async function handler(req, res) {
           await withLock(`room:${code}`, async () => {
             const candidate = await getRoom(code);
             if (!candidate) { await redis('SREM', 'public:rooms', code); return; }
+            const before = roomRevision(candidate);
             advance(candidate, Date.now());
-            if (candidate.state !== 'LOBBY') { await saveRoom(candidate); await redis('SREM', 'public:rooms', code); return; }
+            if (candidate.state !== 'LOBBY') {
+              await saveRoom(candidate);
+              if (before !== roomRevision(candidate)) await publishRoomChanged(candidate.code);
+              await redis('SREM', 'public:rooms', code);
+              return;
+            }
             if (!room && candidate.mode === 'public' && candidate.state === 'LOBBY' && candidate.players.length < 6 && Date.now() < candidate.matchDeadline) {
               await addPlayer(candidate, name);
               room = candidate;
               await saveRoom(candidate);
+              if (before !== roomRevision(candidate)) await publishRoomChanged(candidate.code);
             }
           });
           if (room) break;

@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { extname, join } from 'node:path';
+import { Server as SocketServer } from 'socket.io';
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 4173);
@@ -9,6 +10,7 @@ const rooms = new Map();
 const streams = new Map();
 const sessions = new Map();
 const rateBuckets = new Map();
+let io = null;
 const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 
 const bank = [
@@ -78,6 +80,7 @@ function snapshot(room, viewer) {
   return base;
 }
 function publish(room) {
+  io?.to(`room:${room.code}`).emit('room:changed');
   for (const p of room.players) {
     const res = streams.get(p.session);
     if (res && !res.destroyed) res.write(`event: state\ndata: ${JSON.stringify(snapshot(room, p))}\n\n`);
@@ -240,4 +243,17 @@ const server = http.createServer(async (req, res) => {
 
 function startGame(room) { clearTimers(room); room.used = []; room.round = 0; room.players.forEach(p => { p.score = 0; p.matches = 0; }); beginRound(room); }
 export { bank };
-if (!process.env.VERCEL) server.listen(port, '0.0.0.0', () => console.log(`Same Brain is running at http://localhost:${port}`));
+if (!process.env.VERCEL) {
+  io = new SocketServer(server, { path: '/api/socket-io/socket.io', transports: ['websocket'] });
+  io.use((socket, next) => {
+    const found = playerFor(socket.handshake.auth?.session);
+    if (!found) return next(new Error('This room session has ended.'));
+    socket.data.roomCode = found.room.code;
+    next();
+  });
+  io.on('connection', socket => {
+    socket.join(`room:${socket.data.roomCode}`);
+    socket.emit('room:changed');
+  });
+  server.listen(port, '0.0.0.0', () => console.log(`Same Brain is running at http://localhost:${port}`));
+}

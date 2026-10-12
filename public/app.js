@@ -1,11 +1,39 @@
 const app = document.querySelector('#app');
 const toastEl = document.querySelector('#toast');
 const howDialog = document.querySelector('#how-dialog');
-const state = { session: localStorage.getItem('same-brain-session'), room: null, screen: 'home', questions: 5, seconds: 15, draft: '', source: null, tick: null, pollTimer: null, draftTimer: null, offset: 0, error: '', pollInFlight: false };
+const state = { session: localStorage.getItem('same-brain-session'), room: null, screen: 'home', questions: 5, seconds: 15, draft: '', source: null, socket: null, socketWarned: false, tick: null, pollTimer: null, pollNow: null, draftTimer: null, offset: 0, error: '', pollInFlight: false, syncFailures: 0 };
 const safe = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const playerById = id => state.room?.players.find(p => p.id === id);
 function toast(message) { toastEl.textContent = message; toastEl.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => toastEl.classList.remove('show'), 2600); }
-function stopStream() { state.source?.close(); state.source = null; clearInterval(state.tick); clearInterval(state.pollTimer); state.pollTimer = null; }
+function stopStream() {
+  state.source?.close(); state.source = null;
+  state.socket?.disconnect(); state.socket = null;
+  clearInterval(state.tick); clearInterval(state.pollTimer); state.pollTimer = null;
+  state.pollNow = null;
+}
+function connectRealtime() {
+  if (!state.session || state.socket || typeof window.io !== 'function') return;
+  const socket = window.io({
+    path: '/api/socket-io/socket.io',
+    transports: ['websocket'],
+    auth: { session: state.session },
+    reconnection: true,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 5000,
+    timeout: 5000
+  });
+  state.socket = socket;
+  socket.on('connect', () => {
+    if (state.socketWarned) toast('Live updates restored.');
+    state.socketWarned = false;
+    state.pollNow?.();
+  });
+  socket.on('room:changed', () => state.pollNow?.());
+  socket.on('connect_error', () => {
+    if (!state.socketWarned) toast('Live updates reconnecting.');
+    state.socketWarned = true;
+  });
+}
 function sync() {
   stopStream();
   if (!state.session) return;
@@ -16,8 +44,10 @@ function sync() {
     try {
       const response = await fetch(`/api/state?session=${encodeURIComponent(state.session)}`, { cache: 'no-store' });
       if (response.status === 401) { home(); toast('That room session has ended. You can start a fresh game.'); return; }
-      if (!response.ok) return;
+      if (!response.ok) throw new Error(`Sync failed (${response.status}).`);
       const next = await response.json();
+      if (state.syncFailures >= 3) toast('Connection restored.');
+      state.syncFailures = 0;
       state.offset = next.serverNow - Date.now();
       const comparable = { ...next }; delete comparable.serverNow;
       const serialized = JSON.stringify(comparable);
@@ -41,8 +71,13 @@ function sync() {
         nextInput?.focus();
         if (selection != null) nextInput?.setSelectionRange(selection, selection);
       }
-    } catch {} finally { state.pollInFlight = false; }
+    } catch {
+      state.syncFailures += 1;
+      if (state.syncFailures === 3) toast('Connection interrupted. Reconnecting…');
+    } finally { state.pollInFlight = false; }
   };
+  state.pollNow = poll;
+  connectRealtime();
   poll();
   state.pollTimer = setInterval(poll, 1200);
 }
@@ -215,6 +250,8 @@ document.querySelector('#how-button').addEventListener('click', () => howDialog.
 document.querySelector('#close-how').addEventListener('click', () => howDialog.close());
 document.querySelector('#got-it').addEventListener('click', () => howDialog.close());
 howDialog.addEventListener('click', event => { if (event.target === howDialog) howDialog.close(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) state.pollNow?.(); });
+window.addEventListener('online', () => state.pollNow?.());
 
 if (state.session) { state.screen = 'lobby'; sync(); }
 else { state.screen = new URLSearchParams(location.search).has('room') ? 'join' : 'home'; draw(); }

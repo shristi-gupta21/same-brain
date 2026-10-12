@@ -4,6 +4,9 @@
   "functions": {
     "api/[action].js": {
       "maxDuration": 15
+    },
+    "api/socket-io.js": {
+      "maxDuration": 300
     }
   }
 }
