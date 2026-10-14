@@ -4,12 +4,23 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "dev": "concurrently -k \"node server.js\" \"vite --host 0.0.0.0\"",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "start": "npm run build && node server.js"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
     "@socket.io/redis-emitter": "^5.1.0",
     "redis": "^6.3.0",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "concurrently": "^9.1.2",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.7",
+    "vue-tsc": "^2.2.0"
   }
 }

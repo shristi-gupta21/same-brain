@@ -1,5 +1,5 @@
 {
-  "framework": null,
+  "framework": "vite",
   "outputDirectory": "public",
   "functions": {
     "api/[action].js": {

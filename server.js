@@ -236,8 +236,8 @@ const server = http.createServer(async (req, res) => {
     } catch (error) { return endResponse(res, 400, { error: error.message || 'Something went wrong.' }); }
   }
   const path = url.pathname === '/' ? '/index.html' : url.pathname;
-  if (!['/index.html', '/styles.css', '/app.js'].includes(path)) { res.writeHead(404); return res.end('Not found'); }
-  try { const contents = await readFile(join(root, path.replace(/^\//, ''))); res.writeHead(200, { 'content-type': mime[extname(path)] || 'application/octet-stream' }); res.end(contents); }
+  if (!/^\/(?:index\.html|socket\.io\.min\.js|assets\/[A-Za-z0-9._-]+\.(?:js|css))$/.test(path)) { res.writeHead(404); return res.end('Not found'); }
+  try { const contents = await readFile(join(root, 'public', path.replace(/^\//, ''))); res.writeHead(200, { 'content-type': mime[extname(path)] || 'application/octet-stream' }); res.end(contents); }
   catch { res.writeHead(404); res.end('Not found'); }
 });
 

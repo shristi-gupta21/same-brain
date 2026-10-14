@@ -31,7 +31,7 @@ button, input { font: inherit; }
 .brand-mark i:last-child { right: 7px; }
 .how-link { border: 0; background: none; color: #66635e; font-size: 13px; font-weight: 600; cursor: pointer; }
 .how-link span { color: #8b86df; margin-left: 4px; }
-#app { flex: 1; display: flex; align-items: center; justify-content: center; padding: 38px 0 54px; }
+.main-content { flex: 1; display: flex; align-items: center; justify-content: center; padding: 38px 0 54px; }
 .footer { height: 49px; display: flex; align-items: center; justify-content: center; gap: 4px; border-top: 1px solid var(--line); font-size: 11px; color: #aaa59d; }
 .footer-dot { color: #837ed1; }
 .screen { width: 100%; animation: enter .36s ease both; }
@@ -207,7 +207,7 @@ button, input { font: inherit; }
   .reveal-top { margin-bottom: 18px; }
   .results-actions { flex-direction: column; }
   .results-actions .button { width: 100%; }
-  #app { padding: 27px 0 38px; }
+  .main-content { padding: 27px 0 38px; }
   .footer { height: 42px; font-size: 10px; }
 }
 

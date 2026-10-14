@@ -6,30 +6,10 @@
     <meta name="theme-color" content="#f8f5ef" />
     <meta name="description" content="Think alike. Win together-ish. A fast, friendly multiplayer party game." />
     <title>Same Brain</title>
-    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <header class="topbar">
-        <button class="brand" id="home-button" aria-label="Same Brain home">
-          <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
-          <span>same brain</span>
-        </button>
-        <button class="how-link" id="how-button">How to play <span aria-hidden="true">↗</span></button>
-      </header>
-      <main id="app" aria-live="polite"></main>
-      <footer class="footer"><span>Made for people who finish each other's</span><span class="footer-dot">thoughts.</span></footer>
-    </div>
-    <div class="toast" id="toast" role="status"></div>
-    <dialog id="how-dialog" class="how-dialog">
-      <button class="dialog-close" id="close-how" aria-label="Close">×</button>
-      <div class="eyebrow">THE WHOLE IDEA</div><h2>Think alike.<br />Win together-ish.</h2>
-      <p>Everyone gets the same question. Type the answer you think someone else will choose.</p>
-      <p>A match earns points, but a smaller matching group earns more. So go with your gut, then see whose brain took the same turn.</p>
-      <div class="scoring"><span>2 alike <b>100 pts</b></span><span>3 alike <b>70 pts</b></span><span>4 alike <b>50 pts</b></span></div>
-      <button class="button primary full" id="got-it">Got it</button>
-    </dialog>
+    <div id="vue-app"></div>
     <script src="/socket.io.min.js"></script>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
