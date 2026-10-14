@@ -26,7 +26,8 @@ export function useSameBrain() {
   let tickTimer: number | undefined;
   let draftTimer: number | undefined;
   let toastTimer: number | undefined;
-  let pollInFlight = false;
+  let pollTail: Promise<void> = Promise.resolve();
+  let pollGeneration = 0;
   let socketWarned = false;
   let syncFailures = 0;
   let pollNow: (() => Promise<void>) | null = null;
@@ -59,6 +60,8 @@ export function useSameBrain() {
     window.clearInterval(pollTimer);
     pollTimer = undefined;
     pollNow = null;
+    pollGeneration += 1;
+    pollTail = Promise.resolve();
   }
 
   function home() {
@@ -99,12 +102,15 @@ export function useSameBrain() {
     stopSync();
     if (!state.session) return;
     previousSnapshot = '';
+    const generation = pollGeneration;
 
-    const poll = async () => {
-      if (!state.session || pollInFlight) return;
-      pollInFlight = true;
+    const fetchState = async () => {
+      const session = state.session;
+      const generation = pollGeneration;
+      if (!session) return;
       try {
-        const response = await fetch(`/api/state?session=${encodeURIComponent(state.session)}`, { cache: 'no-store' });
+        const response = await fetch(`/api/state?session=${encodeURIComponent(session)}`, { cache: 'no-store' });
+        if (state.session !== session || generation !== pollGeneration) return;
         if (response.status === 401) {
           home();
           toast('That room session has ended. You can start a fresh game.');
@@ -113,6 +119,7 @@ export function useSameBrain() {
         if (!response.ok) throw new Error(`Sync failed (${response.status}).`);
 
         const next = await response.json() as Room;
+        if (state.session !== session || generation !== pollGeneration) return;
         if (syncFailures >= 3) toast('Connection restored.');
         syncFailures = 0;
         state.offset = next.serverNow - Date.now();
@@ -132,16 +139,24 @@ export function useSameBrain() {
         state.room = next;
         state.screen = screenForRoom(next);
       } catch {
+        if (state.session !== session || generation !== pollGeneration) return;
         syncFailures += 1;
         if (syncFailures === 3) toast('Connection interrupted. Reconnecting…');
-      } finally {
-        pollInFlight = false;
       }
+    };
+
+    // Each caller waits for a fetch that starts after it asked. Skipping an in-flight poll
+    // let the button leave its loading state before the screen had the new room.
+    const poll = () => {
+      const run = pollTail.then(fetchState, fetchState);
+      pollTail = run.then(() => undefined, () => undefined);
+      return run;
     };
 
     pollNow = poll;
     connectRealtime();
-    void poll();
+    await poll();
+    if (!state.session || generation !== pollGeneration) return;
     pollTimer = window.setInterval(() => { void poll(); }, 1200);
   }
 
