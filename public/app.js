@@ -78,8 +78,9 @@ function sync() {
   };
   state.pollNow = poll;
   connectRealtime();
-  poll();
+  const initialSync = poll();
   state.pollTimer = setInterval(poll, 1200);
+  return initialSync;
 }
 async function api(path, data = {}, needsSession = true) {
   const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(needsSession && state.session ? { 'x-session': state.session } : {}) }, body: JSON.stringify(data) });
@@ -87,10 +88,33 @@ async function api(path, data = {}, needsSession = true) {
   if (!response.ok) throw new Error(result.error || 'Something went wrong.');
   return result;
 }
+async function withButtonLoading(button, label, task) {
+  if (!button || button.disabled) return;
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.classList.add('is-loading');
+  button.setAttribute('aria-busy', 'true');
+  button.innerHTML = `<span class="button-spinner" aria-hidden="true"></span><span>${safe(label)}</span>`;
+  try { return await task(); }
+  finally {
+    if (button.isConnected) {
+      button.innerHTML = original;
+      button.disabled = false;
+      button.classList.remove('is-loading');
+      button.removeAttribute('aria-busy');
+    }
+  }
+}
+async function withFormLoading(form, label, task) {
+  if (form.dataset.pending) return;
+  form.dataset.pending = 'true';
+  try { await withButtonLoading(form.querySelector('[type="submit"]'), label, task); }
+  finally { if (form.isConnected) delete form.dataset.pending; }
+}
 async function enterRoom(path, data) {
   try {
     const result = await api(path, data, false);
-    state.session = result.session; localStorage.setItem('same-brain-session', result.session); state.draft = ''; state.error = ''; sync();
+    state.session = result.session; localStorage.setItem('same-brain-session', result.session); state.draft = ''; state.error = ''; await sync();
   } catch (error) { state.error = error.message; draw(); }
 }
 function home() { stopStream(); state.session = null; state.room = null; state.draft = ''; state.screen = 'home'; localStorage.removeItem('same-brain-session'); history.replaceState(null, '', location.pathname); draw(); }
@@ -223,8 +247,14 @@ document.addEventListener('click', async event => {
   if (action === 'back') back();
   if (action === 'home') home();
   if (action === 'quick') { state.screen='quick';state.error='';draw(); }
-  if (action === 'start') { button.disabled=true; try { await api('start'); } catch(error) { toast(error.message); } }
-  if (action === 'rematch') { button.disabled=true; try { await api('rematch'); } catch(error) { toast(error.message);button.disabled=false; } }
+  if (action === 'start') {
+    try { await withButtonLoading(button, 'Starting…', async () => { await api('start'); await state.pollNow?.(); }); }
+    catch(error) { toast(error.message); }
+  }
+  if (action === 'rematch') {
+    try { await withButtonLoading(button, 'Starting rematch…', async () => { await api('rematch'); await state.pollNow?.(); }); }
+    catch(error) { toast(error.message); }
+  }
   if (action === 'copy-code') { await navigator.clipboard?.writeText(state.room.roomCode); toast('Room code copied.'); }
   if (action === 'copy-link') { await navigator.clipboard?.writeText(`${location.origin}${location.pathname}?room=${state.room.roomCode}`); toast('Invite link copied.'); }
 });
@@ -236,13 +266,17 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('submit', async event => {
   event.preventDefault(); const form = event.target;
-  if (form.id === 'create-form') { const name = new FormData(form).get('name'); enterRoom('create',{name,questions:state.questions,seconds:state.seconds}); }
-  if (form.id === 'join-form') { const values = new FormData(form); enterRoom('join',{name:values.get('name'),code:values.get('code')}); }
-  if (form.id === 'quick-form') { const name = new FormData(form).get('name'); enterRoom('quickplay',{name}); }
+  if (form.dataset.pending) return;
+  if (form.id === 'create-form') { const name = new FormData(form).get('name'); await withFormLoading(form, 'Creating room…', () => enterRoom('create',{name,questions:state.questions,seconds:state.seconds})); }
+  if (form.id === 'join-form') { const values = new FormData(form); await withFormLoading(form, 'Joining room…', () => enterRoom('join',{name:values.get('name'),code:values.get('code')})); }
+  if (form.id === 'quick-form') { const name = new FormData(form).get('name'); await withFormLoading(form, 'Finding a match…', () => enterRoom('quickplay',{name})); }
   if (form.id === 'answer-form') {
     const value = new FormData(form).get('answer'); state.draft = String(value || '');
-    try { await api('submit',{answer:state.draft}); state.draft=''; }
+    const input = form.querySelector('[name="answer"]');
+    input.disabled = true;
+    try { await withFormLoading(form, 'Submitting…', async () => { await api('submit',{answer:state.draft}); state.draft=''; await state.pollNow?.(); }); }
     catch(error) { toast(error.message); }
+    finally { if (input.isConnected && !state.room?.ownSubmitted) input.disabled = remaining() === 0; }
   }
 });
 document.querySelector('#home-button').addEventListener('click', home);

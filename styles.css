@@ -48,6 +48,9 @@ button, input { font: inherit; }
 .button:hover:not(:disabled) { transform: translateY(-2px); }
 .button:active:not(:disabled) { transform: translateY(0); }
 .button:disabled { opacity: .42; cursor: not-allowed; }
+.button.is-loading:disabled { opacity: .82; cursor: wait; }
+.button-spinner { width: 15px; height: 15px; flex: 0 0 15px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: button-spin .7s linear infinite; }
+@keyframes button-spin { to { transform: rotate(360deg); } }
 .primary { color: #fff; background: #5d59a8; box-shadow: 0 5px 0 #454184; }
 .primary:hover:not(:disabled) { background: #514d9b; box-shadow: 0 7px 0 #454184; }
 .secondary { background: var(--white); border-color: #ded9cf; color: var(--ink); }
